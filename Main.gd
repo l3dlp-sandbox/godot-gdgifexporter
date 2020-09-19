@@ -8,6 +8,9 @@ var img1: Image = preload("res://images/for_export/colors2.png").get_image()
 var img2: Image = preload("res://images/for_export/colors.png").get_image()
 var img3: Image = preload("res://images/for_export/one_color.png").get_image()
 var img4: Image = preload("res://images/for_export/half_transparent.png").get_image()
+var gifimporter = preload("res://gdgifexporter/gifimporter.gd")
+var enhanced_uniform_quantizator = preload("res://gdgifexporter/quantization/enhanced_uniform_quantization.gd").new()
+var median_cut = preload("res://gdgifexporter/quantization/median_cut.gd").new()
 
 var export_thread := Thread.new()
 var timer := 0.0
@@ -63,3 +66,18 @@ func _on_Button_pressed():
 			export_thread.wait_to_finish()
 		export_thread = Thread.new()
 		export_thread.start(export_thread_method.bind({}))
+
+
+func _on_ImportButton_pressed():
+	var import_file: File = File.new()
+	import_file.open('res://images/for_import/result.gif', File.READ)
+	if not import_file.is_open():
+		printerr("Couldn't open the file!")
+		return
+	
+	var importer = gifimporter.new(import_file)
+	var result = importer.import()
+	if result != gifimporter.Error.OK:
+		printerr('An error has occured while importing: %d' % [result])
+	
+	import_file.close()

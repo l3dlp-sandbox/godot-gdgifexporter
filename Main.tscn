@@ -21,8 +21,15 @@ layout_mode = 2
 alignment = 1
 
 [node name="Button" type="Button" parent="CenterContainer/VBoxContainer"]
-layout_mode = 2
-text = "Start"
+margin_right = 56.0
+margin_bottom = 20.0
+text = "Export"
+
+[node name="ImportButton" type="Button" parent="CenterContainer/VBoxContainer"]
+margin_top = 24.0
+margin_right = 56.0
+margin_bottom = 44.0
+text = "Import"
 
 [node name="TextureRect" type="TextureRect" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
@@ -31,3 +38,4 @@ layout_mode = 2
 layout_mode = 2
 
 [connection signal="pressed" from="CenterContainer/VBoxContainer/Button" to="." method="_on_Button_pressed"]
+[connection signal="pressed" from="CenterContainer/VBoxContainer/ImportButton" to="." method="_on_ImportButton_pressed"]
