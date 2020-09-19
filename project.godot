@@ -6,7 +6,27 @@
 ;   [section] ; section goes between []
 ;   param=value ; assign values to parameters
 
+<<<<<<< HEAD
 config_version=5
+=======
+config_version=4
+
+_global_script_classes=[ {
+"base": "Reference",
+"class": "GIFDataTypes",
+"language": "GDScript",
+"path": "res://gdgifexporter/gifdatatypes.gd"
+}, {
+"base": "GIFDataTypes",
+"class": "GIFExporter",
+"language": "GDScript",
+"path": "res://gdgifexporter/gifexporter.gd"
+} ]
+_global_script_class_icons={
+"GIFDataTypes": "",
+"GIFExporter": ""
+}
+>>>>>>> 377063a (Moved everything into different directories and started working on gif importer.)
 
 [application]
 

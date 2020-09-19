@@ -4,10 +4,10 @@ const GIFExporter := preload("res://gdgifexporter/exporter.gd")
 const MedianCutQuantization := preload("res://gdgifexporter/quantization/median_cut.gd")
 const UniformQuantization := preload("res://gdgifexporter/quantization/uniform.gd")
 
-var img1: Image = preload("res://imgs/colors2.png").get_image()
-var img2: Image = preload("res://imgs/colors.png").get_image()
-var img3: Image = preload("res://imgs/one_color.png").get_image()
-var img4: Image = preload("res://imgs/half_transparent.png").get_image()
+var img1: Image = preload("res://images/for_export/colors2.png").get_image()
+var img2: Image = preload("res://images/for_export/colors.png").get_image()
+var img3: Image = preload("res://images/for_export/one_color.png").get_image()
+var img4: Image = preload("res://images/for_export/half_transparent.png").get_image()
 
 var export_thread := Thread.new()
 var timer := 0.0
