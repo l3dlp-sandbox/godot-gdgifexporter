@@ -74,6 +74,7 @@ func compress_lzw(index_stream: PackedByteArray, colors: PackedByteArray) -> Arr
 				code_table[new_index_buffer] = entries_counter
 				entries_counter += 1
 			else:
+				var a = code_table.find(index_buffer)
 				# if we exceeded 4095 index (code table is full), we should
 				# output Clear Code and reset everything.
 				binary_code_stream.write_bits(clear_code_index, current_code_size)
@@ -100,3 +101,70 @@ func compress_lzw(index_stream: PackedByteArray, colors: PackedByteArray) -> Arr
 	var min_code_size: int = get_bit_length(clear_code_index) - 1
 
 	return [binary_code_stream.pack(), min_code_size]
+
+
+func decompress_lzw(code_stream_data: PoolByteArray, min_code_size: int, colors: PoolByteArray) -> PoolByteArray:
+	var code_table: CodeTable = initialize_color_code_table(colors)
+	var index_stream: PoolByteArray = PoolByteArray([])
+	var binary_code_stream = lsbbitunpacker.LSB_LZWBitUnpacker.new(code_stream_data)
+	var current_code_size: int = min_code_size + 1
+	var clear_code_index: int = pow(2, min_code_size)
+
+	# CODE is an index of code table, {CODE} is sequence inside
+	# code table with index CODE. The same goes for PREVCODE.
+	
+	# Remove first Clear Code from stream. We don't need it.
+	binary_code_stream.remove_bits(current_code_size)
+
+	# let CODE be the first code in the code stream
+	var code: int = binary_code_stream.read_bits(current_code_size)
+	# output {CODE} to index stream
+	index_stream.append_array(code_table.get(code).sequence)
+	# set PREVCODE = CODE
+	var prevcode: int = code
+	# <LOOP POINT>
+	while true:
+		# let CODE be the next code in the code stream
+		code = binary_code_stream.read_bits(current_code_size)
+		# Detect Clear Code. When detected reset everything and get next code.
+		if code == clear_code_index:
+			code_table = initialize_color_code_table(colors)
+			current_code_size = min_code_size + 1
+			code = binary_code_stream.read_bits(current_code_size)
+			prevcode = code
+			index_stream.append(code)
+			code = binary_code_stream.read_bits(current_code_size)
+		elif code == clear_code_index + 1: # Stop when detected EOI Code.
+			break
+		# is CODE in the code table?
+		var code_entry: CodeEntry = code_table.get(code)
+		if code_entry != null: # if YES
+			# output {CODE} to index stream
+			index_stream.append_array(code_entry.sequence)
+			# let K be the first index in {CODE}
+			var K: CodeEntry = CodeEntry.new([code_entry.sequence[0]])
+			# warning-ignore:return_value_discarded
+			# add {PREVCODE} + K to the code table
+			code_table.add(code_table.get(prevcode).add(K))
+			# set PREVCODE = CODE
+			prevcode = code
+		else: # if NO
+			# let K be the first index of {PREVCODE}
+			var prevcode_entry: CodeEntry = code_table.get(prevcode)
+			var K: CodeEntry = CodeEntry.new([prevcode_entry.sequence[0]])
+			# output {PREVCODE} + K to index stream
+			index_stream.append_array(prevcode_entry.add(K).sequence)
+			# add {PREVCODE} + K to code table
+			# warning-ignore:return_value_discarded
+			code_table.add(prevcode_entry.add(K))
+			# set PREVCODE = CODE
+			prevcode = code
+
+		# Detect when we should increase current code size and increase it.
+		# I suspected that the current_code_size was changing when it shouldn't
+		# (before it could read clear code) so I made it never exceed over 12.
+		var new_code_size_candidate: int = get_bits_number_for(code_table.counter) % 13
+		if new_code_size_candidate > current_code_size:
+			current_code_size = new_code_size_candidate
+
+	return index_stream
