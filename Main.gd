@@ -70,7 +70,7 @@ func _on_Button_pressed():
 
 func _on_ImportButton_pressed():
 	var import_file: File = File.new()
-	import_file.open('res://images/for_import/result.gif', File.READ)
+	import_file.open('res://images/for_import/giphy.gif', File.READ)
 	if not import_file.is_open():
 		printerr("Couldn't open the file!")
 		return
@@ -81,3 +81,7 @@ func _on_ImportButton_pressed():
 		printerr('An error has occured while importing: %d' % [result])
 	
 	import_file.close()
+	
+	var img_texture := ImageTexture.new()
+	img_texture.create_from_image(importer.frames[0].image)
+	$CenterContainer/VBoxContainer/TextureRect.texture = img_texture
