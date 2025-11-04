@@ -79,6 +79,5 @@ func _on_ImportButton_pressed():
 
 	import_file.close()
 
-	var img_texture := ImageTexture.new()
-	img_texture.create_from_image(importer.frames[0].image)
+	var img_texture := ImageTexture.create_from_image(importer.frames[0].image)
 	$CenterContainer/VBoxContainer/TextureRect.texture = img_texture

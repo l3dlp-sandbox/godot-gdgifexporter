@@ -13,12 +13,17 @@ func get_bit_length(value: int) -> int:
 	return ceili(log(value | 0x1 + 1) / 0.6931471805599453)
 
 
+func _get_clear_code_index(colors: PackedByteArray) -> int:
+	var last_color_index: int = colors.size() - 1
+	return pow(2, get_bit_length(last_color_index))
+
+
 func initialize_color_code_table(colors: PackedByteArray) -> void:
 	code_table.clear()
 	entries_counter = 0
 	for color_id in colors:
-		# warning-ignore:return_value_discarded
-		code_table[PackedByteArray([color_id])] = entries_counter
+		var entry := PackedByteArray([color_id])
+		code_table[entry] = entries_counter
 		entries_counter += 1
 	# move counter to the first available compression code index
 	var last_color_index: int = colors.size() - 1
@@ -39,8 +44,7 @@ func compress_lzw(index_stream: PackedByteArray, colors: PackedByteArray) -> Arr
 	# all colors (for example 16 colors) with indexes from 0 to 15.
 	# Number 15 is in binary 0b1111, so we'll need 4 bits to write all
 	# colors down.
-	var last_color_index: int = colors.size() - 1
-	var clear_code_index: int = pow(2, get_bit_length(last_color_index))
+	var clear_code_index: int = _get_clear_code_index(colors)
 	var current_code_size: int = get_bit_length(clear_code_index)
 	var binary_code_stream = lsbbitpacker.LSBLZWBitPacker.new()
 
@@ -67,8 +71,7 @@ func compress_lzw(index_stream: PackedByteArray, colors: PackedByteArray) -> Arr
 
 			# We don't want to add new code to code table if we've exceeded 4095
 			# index.
-			var last_entry_index: int = entries_counter - 1
-			if last_entry_index != 4095:
+			if entries_counter - 1 != 4095:
 				# Output the code for just the index buffer to our code stream
 				# warning-ignore:return_value_discarded
 				code_table[new_index_buffer] = entries_counter
@@ -100,73 +103,3 @@ func compress_lzw(index_stream: PackedByteArray, colors: PackedByteArray) -> Arr
 	var min_code_size: int = get_bit_length(clear_code_index) - 1
 
 	return [binary_code_stream.pack(), min_code_size]
-
-
-# gdlint: ignore=max-line-length
-
-
-func decompress_lzw(code_stream_data: PackedByteArray, min_code_size: int, colors: PackedByteArray) -> PackedByteArray:
-	var index_stream := PackedByteArray()
-	var binary_code_stream = lsbbitunpacker.LSBLZWBitUnpacker.new(code_stream_data)
-
-	# Initialize code table
-	initialize_color_code_table(colors)
-
-	var current_code_size: int = min_code_size + 1
-	var clear_code_index: int = pow(2, min_code_size)
-
-	# Remove first Clear Code from stream (we don’t need it)
-	binary_code_stream.remove_bits(current_code_size)
-
-	# Read first code
-	var code: int = binary_code_stream.read_bits(current_code_size)
-	index_stream.append_array(code_table.keys()[code])
-	var prev_code: int = code
-
-	while true:
-		code = binary_code_stream.read_bits(current_code_size)
-
-		# Detect Clear Code (reset)
-		if code == clear_code_index:
-			initialize_color_code_table(colors)
-			current_code_size = min_code_size + 1
-			code = binary_code_stream.read_bits(current_code_size)
-			prev_code = code
-			index_stream.append_array(code_table.keys()[code])
-			code = binary_code_stream.read_bits(current_code_size)
-			continue
-
-		# End of Information code
-		elif code == clear_code_index + 1:
-			break
-
-		var entry: PackedByteArray = code_table.keys()[code] if code_table.has(code_table.keys()[code]) else null
-
-		if entry != null:
-			# output {CODE}
-			index_stream.append_array(entry)
-			# K is the first element of {CODE}
-			var K := PackedByteArray([entry[0]])
-			# add {PREVCODE} + K
-			var new_entry := PackedByteArray(code_table.keys()[prev_code])
-			new_entry.append_array(K)
-			code_table[new_entry] = entries_counter
-			entries_counter += 1
-			prev_code = code
-		else:
-			# if CODE not in table
-			var prev_entry: PackedByteArray = code_table.keys()[prev_code]
-			var K := PackedByteArray([prev_entry[0]])
-			var new_entry := PackedByteArray(prev_entry)
-			new_entry.append_array(K)
-			index_stream.append_array(new_entry)
-			code_table[new_entry] = entries_counter
-			entries_counter += 1
-			prev_code = code
-
-		# Update bit length if needed
-		var new_size := get_bit_length(entries_counter)
-		if new_size > current_code_size and new_size <= 12:
-			current_code_size = new_size
-
-	return index_stream

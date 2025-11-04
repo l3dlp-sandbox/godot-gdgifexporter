@@ -19,7 +19,7 @@ const G: int = 1
 const B: int = 2
 
 var little_endian := preload("res://gdgifexporter/little_endian.gd").new()
-var lzw := preload("res://gdgifexporter/gif-lzw/lzw.gd").new()
+var lzw := preload("res://gdgifexporter/gif-lzw/lzw_decompress.gd").new()
 
 var header: PackedByteArray
 var logical_screen_descriptor: PackedByteArray
@@ -175,7 +175,6 @@ func load_interlaced_image_data(
 func load_progressive_image_data(
 	color_table: Array, w: int, h: int, transparency_index: int = -1
 ) -> Image:
-	var result_image: Image = Image.new()
 
 	var encrypted_image_data: PackedByteArray = load_encrypted_image_data(color_table)
 
@@ -183,7 +182,7 @@ func load_progressive_image_data(
 		encrypted_image_data, color_table, transparency_index
 	)
 
-	result_image.create_from_data(w, h, false, Image.FORMAT_RGBA8, decrypted_image_data)
+	var result_image := Image.create_from_data(w, h, false, Image.FORMAT_RGBA8, decrypted_image_data)
 
 	return result_image
 
@@ -312,11 +311,15 @@ func handle_extension_introducer() -> int:
 
 
 func import() -> int:
-	# if file is empty return
+	# Reset state
+	frames = []
+	is_animated = false
+	global_color_table = []
+	last_graphic_control_extension = null
+
+	# File checks
 	if import_file.get_length() == 0:
 		return Error.FILE_IS_EMPTY
-	# if file has smaller size than header and logical screen descriptor
-	# then return error
 	if import_file.get_length() < 13:
 		return Error.FILE_SMALLER_MINIMUM
 
@@ -328,15 +331,18 @@ func import() -> int:
 		return Error.NOT_A_SUPPORTED_FILE
 
 	# LOGICAL SCREEN DESCRIPTOR
-	# I skip the Sort Flag
 	load_logical_screen_descriptor()
 	if has_global_color_table():
 		load_global_color_table()
 
-	# LOADING FRAMES LOOP
-	while not import_file.eof_reached():
+	# Frame loading loop
+	while import_file.get_position() < import_file.get_length():
+		if import_file.eof_reached():
+			break
+
 		var label: int = import_file.get_8()
-		var error: int
+		var error: int = Error.OK
+
 		match label:
 			0x2C:  # Image Descriptor
 				error = handle_image_descriptor()
@@ -344,6 +350,10 @@ func import() -> int:
 				error = handle_extension_introducer()
 			0x3B:  # Trailer
 				break
+			_:
+				printerr("Unknown block label: ", label)
+				error = Error.OK
+
 		if error != Error.OK:
 			return error
 
