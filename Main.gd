@@ -9,8 +9,6 @@ var img2: Image = preload("res://images/for_export/colors.png").get_image()
 var img3: Image = preload("res://images/for_export/one_color.png").get_image()
 var img4: Image = preload("res://images/for_export/half_transparent.png").get_image()
 var gifimporter = preload("res://gdgifexporter/gifimporter.gd")
-var enhanced_uniform_quantizator = preload("res://gdgifexporter/quantization/enhanced_uniform_quantization.gd").new()
-var median_cut = preload("res://gdgifexporter/quantization/median_cut.gd").new()
 
 var export_thread := Thread.new()
 var timer := 0.0
@@ -69,8 +67,7 @@ func _on_Button_pressed():
 
 
 func _on_ImportButton_pressed():
-	var import_file: File = File.new()
-	import_file.open('res://images/for_import/giphy.gif', File.READ)
+	var import_file := FileAccess.open("res://images/for_import/giphy.gif", FileAccess.READ)
 	if not import_file.is_open():
 		printerr("Couldn't open the file!")
 		return
@@ -78,10 +75,10 @@ func _on_ImportButton_pressed():
 	var importer = gifimporter.new(import_file)
 	var result = importer.import()
 	if result != gifimporter.Error.OK:
-		printerr('An error has occured while importing: %d' % [result])
-	
+		printerr("An error has occured while importing: %d" % [result])
+
 	import_file.close()
-	
+
 	var img_texture := ImageTexture.new()
 	img_texture.create_from_image(importer.frames[0].image)
 	$CenterContainer/VBoxContainer/TextureRect.texture = img_texture

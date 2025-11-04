@@ -6,33 +6,7 @@
 ;   [section] ; section goes between []
 ;   param=value ; assign values to parameters
 
-<<<<<<< HEAD
 config_version=5
-=======
-config_version=4
-
-_global_script_classes=[ {
-"base": "Reference",
-"class": "GIFDataTypes",
-"language": "GDScript",
-"path": "res://gdgifexporter/gifdatatypes.gd"
-}, {
-"base": "GIFDataTypes",
-"class": "GIFExporter",
-"language": "GDScript",
-"path": "res://gdgifexporter/gifexporter.gd"
-}, {
-"base": "GIFDataTypes",
-"class": "GIFImporter",
-"language": "GDScript",
-"path": "res://gdgifexporter/gifimporter.gd"
-} ]
-_global_script_class_icons={
-"GIFDataTypes": "",
-"GIFExporter": "",
-"GIFImporter": ""
-}
->>>>>>> 377063a (Moved everything into different directories and started working on gif importer.)
 
 [application]
 
@@ -43,5 +17,4 @@ config/icon="res://icon.png"
 
 [rendering]
 
-driver/threads/thread_model=2
 environment/defaults/default_environment="res://default_env.tres"

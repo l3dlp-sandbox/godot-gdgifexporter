@@ -1,17 +1,13 @@
 class_name GIFDataTypes
-extends Reference
+extends RefCounted
 
-
-const LittleEndian = preload('./little_endian.gd')
+const LittleEndian = preload("./little_endian.gd")
 
 const extension_introducer: int = 0x21
 const graphic_control_label: int = 0xf9
 
 enum DisposalMethod {
-	NO_SPECIFIED = 0,
-	DO_NOT_DISPOSE = 1,
-	RESTORE_TO_BACKGROUND = 2,
-	RESTORE_TO_PREVOIUS = 3
+	NO_SPECIFIED = 0, DO_NOT_DISPOSE = 1, RESTORE_TO_BACKGROUND = 2, RESTORE_TO_PREVOIUS = 3
 }
 
 
@@ -20,27 +16,26 @@ class GraphicControlExtension:
 	var disposal_method: int = DisposalMethod.DO_NOT_DISPOSE
 	var uses_transparency: bool = false
 	var transparent_color_index: int = 0
-	
+
 	func set_delay_time_from_export(_delay_time: int) -> void:
 		delay_time = float(_delay_time) / 100.0
-	
+
 	func set_packed_fields(packed_fields: int) -> void:
 		disposal_method = (packed_fields & 0b0001_1100) >> 2
 		uses_transparency = true if packed_fields & 1 == 1 else false
-	
+
 	func get_delay_time_for_export() -> int:
 		return int(ceil(delay_time / 0.01))
-	
+
 	func get_packed_fields() -> int:
 		var result: int = 1 if uses_transparency else 0
 		result = result | (disposal_method << 2)
 		return result
-	
-	func to_bytes() -> PoolByteArray:
+
+	func to_bytes() -> PackedByteArray:
 		var little_endian = LittleEndian.new()
-		var result: PoolByteArray = PoolByteArray([])
+		var result: PackedByteArray = PackedByteArray([])
 		var block_size: int = 4
-		
 
 		result.append(extension_introducer)
 		result.append(graphic_control_label)
@@ -51,8 +46,9 @@ class GraphicControlExtension:
 		result.append(transparent_color_index)
 
 		result.append(0)
-		
+
 		return result
+
 
 class ImageDescriptor:
 	var image_separator: int = 0x2c
@@ -62,20 +58,22 @@ class ImageDescriptor:
 	var image_height: int
 	var packed_fields: int = 0b10000000
 
-	func _init(_image_left_position: int,
-			_image_top_position: int,
-			_image_width: int,
-			_image_height: int,
-			size_of_local_color_table: int):
+	func _init(
+		_image_left_position: int,
+		_image_top_position: int,
+		_image_width: int,
+		_image_height: int,
+		size_of_local_color_table: int
+	):
 		image_left_position = _image_left_position
 		image_top_position = _image_top_position
 		image_width = _image_width
 		image_height = _image_height
 		packed_fields = packed_fields | (0b111 & size_of_local_color_table)
 
-	func to_bytes() -> PoolByteArray:
-		var little_endian = preload('./little_endian.gd').new()
-		var result: PoolByteArray = PoolByteArray([])
+	func to_bytes() -> PackedByteArray:
+		var little_endian = preload("./little_endian.gd").new()
+		var result: PackedByteArray = PackedByteArray([])
 
 		result.append(image_separator)
 		result += little_endian.int_to_word(image_left_position)
@@ -86,6 +84,7 @@ class ImageDescriptor:
 
 		return result
 
+
 class LocalColorTable:
 	var colors: Array = []
 
@@ -95,10 +94,10 @@ class LocalColorTable:
 	func get_size() -> int:
 		if colors.size() <= 1:
 			return 0
-		return int(ceil(log2(colors.size()) - 1))
+		return ceili(log2(colors.size()) - 1)
 
-	func to_bytes() -> PoolByteArray:
-		var result: PoolByteArray = PoolByteArray([])
+	func to_bytes() -> PackedByteArray:
+		var result: PackedByteArray = PackedByteArray([])
 
 		for v in colors:
 			result.append(v[0])
@@ -107,27 +106,27 @@ class LocalColorTable:
 
 		if colors.size() != int(pow(2, get_size() + 1)):
 			for i in range(int(pow(2, get_size() + 1)) - colors.size()):
-				result += PoolByteArray([0, 0, 0])
+				result += PackedByteArray([0, 0, 0])
 
 		return result
+
 
 class ApplicationExtension:
 	var extension_introducer: int = 0x21
 	var extension_label: int = 0xff
 
 	var block_size: int = 11
-	var application_identifier: PoolByteArray
-	var appl_authentication_code: PoolByteArray
+	var application_identifier: PackedByteArray
+	var appl_authentication_code: PackedByteArray
 
-	var application_data: PoolByteArray
+	var application_data: PackedByteArray
 
-	func _init(_application_identifier: String,
-			_appl_authentication_code: String):
-		application_identifier = _application_identifier.to_ascii()
-		appl_authentication_code = _appl_authentication_code.to_ascii()
+	func _init(_application_identifier: String, _appl_authentication_code: String):
+		application_identifier = _application_identifier.to_ascii_buffer()
+		appl_authentication_code = _appl_authentication_code.to_ascii_buffer()
 
-	func to_bytes() -> PoolByteArray:
-		var result: PoolByteArray = PoolByteArray([])
+	func to_bytes() -> PackedByteArray:
+		var result: PackedByteArray = PackedByteArray([])
 
 		result.append(extension_introducer)
 		result.append(extension_label)
@@ -142,12 +141,13 @@ class ApplicationExtension:
 
 		return result
 
+
 class ImageData:
 	var lzw_minimum_code_size: int
-	var image_data: PoolByteArray
+	var image_data: PackedByteArray
 
-	func to_bytes() -> PoolByteArray:
-		var result: PoolByteArray = PoolByteArray([])
+	func to_bytes() -> PackedByteArray:
+		var result: PackedByteArray = PackedByteArray([])
 		result.append(lzw_minimum_code_size)
 
 		var block_size_index: int = 0
@@ -164,7 +164,7 @@ class ImageData:
 			if i == 254:
 				i = 0
 
-		if not image_data.empty():
+		if not image_data.is_empty():
 			result.append(0)
 
 		return result
