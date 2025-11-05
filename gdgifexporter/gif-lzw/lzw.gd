@@ -133,15 +133,13 @@ func decompress_lzw(min_code_size: int, data: PackedByteArray) -> PackedByteArra
 	var max_code := (1 << code_size) - 1
 
 	# Initialize dictionary
-	var dict: Dictionary[int, Array] = {}
+	var dict: Dictionary[int, PackedByteArray] = {}
 	for i in range(clear_code):
-		dict[i] = [i]
+		dict[i] = PackedByteArray([i])
 
-	var result = []
-	var reader = BitReader.new(data)
-
-	var prev = null
-
+	var result: PackedByteArray = []
+	var reader := BitReader.new(data)
+	var prev := -1
 	while true:
 		var code := reader.read_bits(code_size)
 
@@ -149,11 +147,11 @@ func decompress_lzw(min_code_size: int, data: PackedByteArray) -> PackedByteArra
 			# Reset dictionary
 			dict.clear()
 			for i in range(clear_code):
-				dict[i] = [i]
+				dict[i] = PackedByteArray([i])
 			code_size = min_code_size + 1
 			next_code = end_code + 1
 			max_code = (1 << code_size) - 1
-			prev = null
+			prev = -1
 			continue
 
 		elif code == end_code:
@@ -162,8 +160,8 @@ func decompress_lzw(min_code_size: int, data: PackedByteArray) -> PackedByteArra
 		var entry: PackedByteArray = []
 		if dict.has(code):
 			entry = dict[code]
-		elif code == next_code and prev != null:
-			entry = dict[prev] + [dict[prev][0]]
+		elif code == next_code and prev != -1:
+			entry = dict[prev] + PackedByteArray([dict[prev][0]])
 		else:
 			# invalid (corrupted GIF)
 			break
@@ -172,8 +170,8 @@ func decompress_lzw(min_code_size: int, data: PackedByteArray) -> PackedByteArra
 		for c in entry:
 			result.append(c)
 
-		if prev != null:
-			var new_entry := dict[prev] + [entry[0]]
+		if prev != -1:
+			var new_entry := dict[prev] + PackedByteArray([entry[0]])
 			dict[next_code] = new_entry
 			next_code += 1
 
