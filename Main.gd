@@ -72,12 +72,15 @@ func _on_ImportButton_pressed():
 		printerr("Couldn't open the file!")
 		return
 
+	var start := Time.get_ticks_msec()
 	var importer = gifimporter.new(import_file)
 	var result = importer.import()
+	import_file.close()
 	if result != gifimporter.Error.OK:
 		printerr("An error has occured while importing: %d" % [result])
 
-	import_file.close()
+	var end := Time.get_ticks_msec()
+	print("Time took: " + str(end - start), " ms")
 
 	var img_texture := ImageTexture.create_from_image(importer.frames[0].image)
 	$CenterContainer/VBoxContainer/TextureRect.texture = img_texture

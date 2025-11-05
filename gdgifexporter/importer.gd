@@ -18,18 +18,17 @@ const R: int = 0
 const G: int = 1
 const B: int = 2
 
-var little_endian := preload("res://gdgifexporter/little_endian.gd").new()
-var lzw := preload("res://gdgifexporter/gif-lzw/lzw.gd").new()
+var lzw := preload("./gif-lzw/lzw.gd").new()
 
 var header: PackedByteArray
 var logical_screen_descriptor: PackedByteArray
 
 var import_file: FileAccess
-var frames: Array
+var frames: Array[GifFrame]
 
 var background_color_index: int
 var pixel_aspect_ratio: int
-var global_color_table: Array
+var global_color_table: Array[PackedByteArray]
 var is_animated: bool = false
 
 var last_graphic_control_extension: GraphicControlExtension = null
@@ -53,14 +52,15 @@ func get_gif_ver() -> String:
 
 func load_logical_screen_descriptor() -> void:
 	logical_screen_descriptor = import_file.get_buffer(7)
+	background_color_index = get_background_color_index()
 
 
 func get_logical_screen_width() -> int:
-	return little_endian.word_to_int(logical_screen_descriptor.slice(0, 1))
+	return logical_screen_descriptor.decode_s16(0)
 
 
 func get_logical_screen_height() -> int:
-	return little_endian.word_to_int(logical_screen_descriptor.slice(2, 3))
+	return logical_screen_descriptor.decode_s16(2)
 
 
 func get_packed_fields() -> int:
@@ -89,21 +89,22 @@ func get_pixel_aspect_ratio() -> int:
 
 func load_global_color_table() -> void:
 	global_color_table = []
-	for i in range(get_size_of_global_color_table()):
-		global_color_table.append([import_file.get_8(), import_file.get_8(), import_file.get_8()])
+	global_color_table.resize(get_size_of_global_color_table())
+	for i in global_color_table.size():
+		var color_bytes := PackedByteArray(
+			[import_file.get_8(), import_file.get_8(), import_file.get_8()]
+		)
+		global_color_table[i] = color_bytes
 
 
-func load_local_color_table(size: int) -> Array:
-	var result: Array = []
+func load_local_color_table(size: int) -> Array[PackedByteArray]:
+	var result: Array[PackedByteArray] = []
+	result.resize(size)
 	for i in range(size):
-		result.append([import_file.get_8(), import_file.get_8(), import_file.get_8()])
-	return result
-
-
-func color_table_to_index_table(color_table: Array) -> Array:
-	var result: Array = []
-	for i in range(color_table.size()):
-		result.append(i)
+		var color_bytes := PackedByteArray(
+			[import_file.get_8(), import_file.get_8(), import_file.get_8()]
+		)
+		result[i] = color_bytes
 	return result
 
 
@@ -139,7 +140,9 @@ func load_compressed_image_data() -> PackedByteArray:
 
 
 func indexes_to_rgba(
-	encrypted_img_data: PackedByteArray, color_table: Array, transparency_index: int
+	encrypted_img_data: PackedByteArray,
+	color_table: Array[PackedByteArray],
+	transparency_index: int
 ) -> PackedByteArray:
 	var result: PackedByteArray = PackedByteArray([])
 	result.resize(encrypted_img_data.size() * 4)  # because RGBA format
@@ -186,9 +189,9 @@ func deinterlace(indexes: PackedByteArray, width: int, height: int) -> PackedByt
 
 	var pos := 0
 	for p in passes:
-		var row = p.start
+		var row: int = p.start
 		while row < height:
-			var row_start = row * width
+			var row_start := row * width
 			for x in range(width):
 				if pos >= indexes.size():
 					return output
@@ -226,8 +229,8 @@ func handle_image_descriptor() -> int:
 	# Skipping sort flag
 	# Skipping reserved bits
 	var size_of_local_color_table: int = pow(2, (packed_field & 0b111) + 1)
-	var local_color_table: Array = []
-	var color_table: Array
+	var local_color_table: Array[PackedByteArray] = []
+	var color_table: Array[PackedByteArray]
 	var image: Image
 
 	if has_local_color_table:
@@ -238,7 +241,8 @@ func handle_image_descriptor() -> int:
 
 	var transparent_color_index: int = -1
 	if last_graphic_control_extension != null:
-		transparent_color_index = last_graphic_control_extension.transparent_color_index
+		if last_graphic_control_extension.uses_transparency:
+			transparent_color_index = last_graphic_control_extension.transparent_color_index
 
 	if is_interlace_flag_on:
 		image = load_interlaced_image_data(color_table, w, h, transparent_color_index)
@@ -246,7 +250,6 @@ func handle_image_descriptor() -> int:
 		image = load_progressive_image_data(color_table, w, h, transparent_color_index)
 
 	var new_frame := GifFrame.new()
-	new_frame.image = image
 	if last_graphic_control_extension != null:
 		new_frame.delay = last_graphic_control_extension.delay_time
 		new_frame.disposal_method = last_graphic_control_extension.disposal_method
@@ -257,6 +260,30 @@ func handle_image_descriptor() -> int:
 		# want to tell end user that this frame has no delay.
 		new_frame.delay = -1
 		new_frame.disposal_method = DisposalMethod.RESTORE_TO_BACKGROUND
+	if frames.size() > 0:
+		var curr_canvas := Image.new()
+		if new_frame.disposal_method == DisposalMethod.RESTORE_TO_BACKGROUND:
+			curr_canvas = Image.create_empty(w, h, false, image.get_format())
+			var r := color_table[background_color_index][R]
+			var g := color_table[background_color_index][G]
+			var b := color_table[background_color_index][B]
+			var a := 255
+			if background_color_index == transparent_color_index:
+				a = 0
+			var background_color := Color.from_rgba8(r, g, b, a)
+			curr_canvas.fill(background_color)
+			curr_canvas.blit_rect(
+				image, Rect2i(Vector2i.ZERO, curr_canvas.get_size()), Vector2i(x, y)
+			)
+		else:
+			var prev_frame := frames[frames.size() - 1]
+			var prev_image := prev_frame.image
+			curr_canvas.copy_from(prev_image)
+			curr_canvas.blit_rect_mask(
+				image, image, Rect2i(Vector2i.ZERO, curr_canvas.get_size()), Vector2i(x, y)
+			)
+		image = curr_canvas
+	new_frame.image = image
 	new_frame.x = x
 	new_frame.y = y
 	new_frame.w = w
@@ -275,6 +302,8 @@ func handle_graphics_control_extension() -> int:
 	var delay_time: int = import_file.get_buffer(2).decode_s16(0)
 	var transparent_color_index: int = import_file.get_8()
 	var block_terminator: int = import_file.get_8()
+	if block_terminator != 0:
+		printerr("Block terminator in graphics control extensions should be 0.")
 
 	var graphic_control_extension: GraphicControlExtension = GraphicControlExtension.new()
 	graphic_control_extension.set_delay_time_from_export(delay_time)
@@ -310,16 +339,14 @@ func handle_application_extension() -> int:
 
 
 func handle_comment_extension() -> int:
-	var comment_label: int = import_file.get_8()
 	skip_data_subblocks()
-	var block_terminator = import_file.get_8()
 	return Error.OK
 
 
 func handle_plain_text_extension() -> int:
-	skip_bytes(13)
+	var block_size := import_file.get_8()
+	skip_bytes(block_size)
 	skip_data_subblocks()
-	var block_terminator = import_file.get_8()
 	return Error.OK
 
 
