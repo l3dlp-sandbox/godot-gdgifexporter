@@ -4,10 +4,11 @@ const GIFExporter := preload("res://gdgifexporter/exporter.gd")
 const MedianCutQuantization := preload("res://gdgifexporter/quantization/median_cut.gd")
 const UniformQuantization := preload("res://gdgifexporter/quantization/uniform.gd")
 
-var img1: Image = preload("res://imgs/colors2.png").get_image()
-var img2: Image = preload("res://imgs/colors.png").get_image()
-var img3: Image = preload("res://imgs/one_color.png").get_image()
-var img4: Image = preload("res://imgs/half_transparent.png").get_image()
+var img1: Image = preload("res://images/for_export/colors2.png").get_image()
+var img2: Image = preload("res://images/for_export/colors.png").get_image()
+var img3: Image = preload("res://images/for_export/one_color.png").get_image()
+var img4: Image = preload("res://images/for_export/half_transparent.png").get_image()
+var gifimporter = preload("res://gdgifexporter/importer.gd")
 
 var export_thread := Thread.new()
 var timer := 0.0
@@ -63,3 +64,23 @@ func _on_Button_pressed():
 			export_thread.wait_to_finish()
 		export_thread = Thread.new()
 		export_thread.start(export_thread_method.bind({}))
+
+
+func _on_ImportButton_pressed():
+	var import_file := FileAccess.open("res://images/for_import/giphy.gif", FileAccess.READ)
+	if not import_file.is_open():
+		printerr("Couldn't open the file!")
+		return
+
+	var start := Time.get_ticks_msec()
+	var importer = gifimporter.new(import_file)
+	var result = importer.import()
+	import_file.close()
+	if result != gifimporter.Error.OK:
+		printerr("An error has occured while importing: %d" % [result])
+
+	var end := Time.get_ticks_msec()
+	print("Time took: " + str(end - start), " ms")
+
+	var img_texture := ImageTexture.create_from_image(importer.frames[0].image)
+	$CenterContainer/VBoxContainer/TextureRect.texture = img_texture

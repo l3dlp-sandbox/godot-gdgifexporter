@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://babsvfuef2pcq"]
 
-[ext_resource type="Script" path="res://Main.gd" id="1"]
+[ext_resource type="Script" uid="uid://7f2q6qcwbtq" path="res://Main.gd" id="1"]
 
 [node name="Control" type="Control"]
 layout_mode = 3
@@ -22,7 +22,11 @@ alignment = 1
 
 [node name="Button" type="Button" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
-text = "Start"
+text = "Export"
+
+[node name="ImportButton" type="Button" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+text = "Import"
 
 [node name="TextureRect" type="TextureRect" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
@@ -31,3 +35,4 @@ layout_mode = 2
 layout_mode = 2
 
 [connection signal="pressed" from="CenterContainer/VBoxContainer/Button" to="." method="_on_Button_pressed"]
+[connection signal="pressed" from="CenterContainer/VBoxContainer/ImportButton" to="." method="_on_ImportButton_pressed"]
