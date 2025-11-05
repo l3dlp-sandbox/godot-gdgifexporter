@@ -127,7 +127,7 @@ func skip_data_subblocks() -> void:
 		import_file.seek(import_file.get_position() + block_size)
 
 
-func load_encrypted_image_data(color_table: Array) -> PackedByteArray:
+func load_compressed_image_data() -> PackedByteArray:
 	var lzw_min_code_size: int = import_file.get_8()
 	var image_data: PackedByteArray = PackedByteArray([])
 
@@ -138,7 +138,7 @@ func load_encrypted_image_data(color_table: Array) -> PackedByteArray:
 	return decompressed_image_data
 
 
-func decrypt_image_data(
+func indexes_to_rgba(
 	encrypted_img_data: PackedByteArray, color_table: Array, transparency_index: int
 ) -> PackedByteArray:
 	var result: PackedByteArray = PackedByteArray([])
@@ -162,19 +162,48 @@ func decrypt_image_data(
 func load_interlaced_image_data(
 	color_table: Array, w: int, h: int, transparency_index: int = -1
 ) -> Image:
-	var image_data: PackedByteArray = load_encrypted_image_data(color_table)
+	var image_data: PackedByteArray = load_compressed_image_data()
+	var deinterlaced_data := deinterlace(image_data, w, h)
+	var decrypted_image_data: PackedByteArray = indexes_to_rgba(
+		deinterlaced_data, color_table, transparency_index
+	)
+	var result_image := Image.create_from_data(
+		w, h, false, Image.FORMAT_RGBA8, decrypted_image_data
+	)
+	return result_image
 
-	printerr("Interlaced images are not implemented yet.")
 
-	return null
+func deinterlace(indexes: PackedByteArray, width: int, height: int) -> PackedByteArray:
+	var output := PackedByteArray()
+	output.resize(width * height)
+
+	var passes: Array[Dictionary] = [
+		{"start": 0, "step": 8},
+		{"start": 4, "step": 8},
+		{"start": 2, "step": 4},
+		{"start": 1, "step": 2},
+	]
+
+	var pos := 0
+	for p in passes:
+		var row = p.start
+		while row < height:
+			var row_start = row * width
+			for x in range(width):
+				if pos >= indexes.size():
+					return output
+				output[row_start + x] = indexes[pos]
+				pos += 1
+			row += p.step
+	return output
 
 
 func load_progressive_image_data(
 	color_table: Array, w: int, h: int, transparency_index: int = -1
 ) -> Image:
-	var encrypted_image_data: PackedByteArray = load_encrypted_image_data(color_table)
+	var encrypted_image_data: PackedByteArray = load_compressed_image_data()
 
-	var decrypted_image_data: PackedByteArray = decrypt_image_data(
+	var decrypted_image_data: PackedByteArray = indexes_to_rgba(
 		encrypted_image_data, color_table, transparency_index
 	)
 
