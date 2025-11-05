@@ -1,18 +1,18 @@
 class_name GIFDataTypes
 extends RefCounted
 
-const LittleEndian = preload("./little_endian.gd")
-
-const extension_introducer: int = 0x21
-const graphic_control_label: int = 0xf9
-
 enum DisposalMethod {
 	NO_SPECIFIED = 0, DO_NOT_DISPOSE = 1, RESTORE_TO_BACKGROUND = 2, RESTORE_TO_PREVOIUS = 3
 }
 
+const LittleEndian := preload("./little_endian.gd")
+
+const EXTENSION_INTRODUCER: int = 0x21
+const GRAPHIC_CONTROL_LABEL: int = 0xf9
+
 
 class GraphicControlExtension:
-	var delay_time: float = 0
+	var delay_time: float = 0.0
 	var disposal_method: int = DisposalMethod.DO_NOT_DISPOSE
 	var uses_transparency: bool = false
 	var transparent_color_index: int = 0
@@ -25,7 +25,7 @@ class GraphicControlExtension:
 		uses_transparency = true if packed_fields & 1 == 1 else false
 
 	func get_delay_time_for_export() -> int:
-		return int(ceil(delay_time / 0.01))
+		return ceili(delay_time / 0.01)
 
 	func get_packed_fields() -> int:
 		var result: int = 1 if uses_transparency else 0
@@ -33,12 +33,12 @@ class GraphicControlExtension:
 		return result
 
 	func to_bytes() -> PackedByteArray:
-		var little_endian = LittleEndian.new()
+		var little_endian := LittleEndian.new()
 		var result: PackedByteArray = PackedByteArray([])
 		var block_size: int = 4
 
-		result.append(extension_introducer)
-		result.append(graphic_control_label)
+		result.append(EXTENSION_INTRODUCER)
+		result.append(GRAPHIC_CONTROL_LABEL)
 
 		result.append(block_size)
 		result.append(get_packed_fields())
@@ -72,7 +72,7 @@ class ImageDescriptor:
 		packed_fields = packed_fields | (0b111 & size_of_local_color_table)
 
 	func to_bytes() -> PackedByteArray:
-		var little_endian = preload("./little_endian.gd").new()
+		var little_endian = LittleEndian.new()
 		var result: PackedByteArray = PackedByteArray([])
 
 		result.append(image_separator)

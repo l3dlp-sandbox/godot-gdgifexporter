@@ -19,7 +19,7 @@ const G: int = 1
 const B: int = 2
 
 var little_endian := preload("res://gdgifexporter/little_endian.gd").new()
-var lzw := preload("res://gdgifexporter/gif-lzw/lzw_decompress.gd").new()
+var lzw := preload("res://gdgifexporter/gif-lzw/lzw.gd").new()
 
 var header: PackedByteArray
 var logical_screen_descriptor: PackedByteArray
@@ -134,10 +134,7 @@ func load_encrypted_image_data(color_table: Array) -> PackedByteArray:
 	# loading data sub-blocks
 	image_data = load_data_subblocks()
 
-	var decompressed_image_data: PackedByteArray = lzw.decompress_lzw(
-		image_data, lzw_min_code_size, PackedByteArray(color_table_to_index_table(color_table))
-	)
-
+	var decompressed_image_data: PackedByteArray = lzw.decompress_lzw(lzw_min_code_size, image_data)
 	return decompressed_image_data
 
 
@@ -175,23 +172,24 @@ func load_interlaced_image_data(
 func load_progressive_image_data(
 	color_table: Array, w: int, h: int, transparency_index: int = -1
 ) -> Image:
-
 	var encrypted_image_data: PackedByteArray = load_encrypted_image_data(color_table)
 
 	var decrypted_image_data: PackedByteArray = decrypt_image_data(
 		encrypted_image_data, color_table, transparency_index
 	)
 
-	var result_image := Image.create_from_data(w, h, false, Image.FORMAT_RGBA8, decrypted_image_data)
+	var result_image := Image.create_from_data(
+		w, h, false, Image.FORMAT_RGBA8, decrypted_image_data
+	)
 
 	return result_image
 
 
 func handle_image_descriptor() -> int:
-	var x: int = little_endian.word_to_int(import_file.get_buffer(2))
-	var y: int = little_endian.word_to_int(import_file.get_buffer(2))
-	var w: int = little_endian.word_to_int(import_file.get_buffer(2))
-	var h: int = little_endian.word_to_int(import_file.get_buffer(2))
+	var x: int = import_file.get_buffer(2).decode_s16(0)
+	var y: int = import_file.get_buffer(2).decode_s16(0)
+	var w: int = import_file.get_buffer(2).decode_s16(0)
+	var h: int = import_file.get_buffer(2).decode_s16(0)
 	var packed_field: int = import_file.get_8()
 
 	var has_local_color_table: bool = (packed_field >> 7) == 1
@@ -245,7 +243,7 @@ func handle_graphics_control_extension() -> int:
 	if block_size != 4:
 		printerr("Graphics extension block size isn't equal to 4!")
 	var packed_fields: int = import_file.get_8()
-	var delay_time: int = little_endian.word_to_int(import_file.get_buffer(2))
+	var delay_time: int = import_file.get_buffer(2).decode_s16(0)
 	var transparent_color_index: int = import_file.get_8()
 	var block_terminator: int = import_file.get_8()
 

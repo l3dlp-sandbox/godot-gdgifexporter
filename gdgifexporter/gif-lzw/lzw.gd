@@ -1,10 +1,30 @@
 extends RefCounted
 
 var lsbbitpacker := preload("./lsbbitpacker.gd")
-var lsbbitunpacker := preload("./lsbbitunpacker.gd")
 
 var code_table: Dictionary[PackedByteArray, int] = {}
 var entries_counter := 0
+
+
+class BitReader:
+	var bytes: PackedByteArray
+	var bit_pos := 0
+
+	func _init(data: PackedByteArray) -> void:
+		bytes = data
+
+	func read_bits(num_bits: int) -> int:
+		var result := 0
+		var bits_read := 0
+		while bits_read < num_bits:
+			var byte_index := bit_pos >> 3
+			var bit_index := bit_pos & 7
+			var b := bytes[byte_index]
+			var bit := (b >> bit_index) & 1
+			result |= bit << bits_read
+			bit_pos += 1
+			bits_read += 1
+		return result
 
 
 func get_bit_length(value: int) -> int:
@@ -103,3 +123,65 @@ func compress_lzw(index_stream: PackedByteArray, colors: PackedByteArray) -> Arr
 	var min_code_size: int = get_bit_length(clear_code_index) - 1
 
 	return [binary_code_stream.pack(), min_code_size]
+
+
+func decompress_lzw(min_code_size: int, data: PackedByteArray) -> PackedByteArray:
+	var clear_code := 1 << min_code_size
+	var end_code := clear_code + 1
+	var next_code := end_code + 1
+	var code_size := min_code_size + 1
+	var max_code := (1 << code_size) - 1
+
+	# Initialize dictionary
+	var dict: Dictionary[int, Array] = {}
+	for i in range(clear_code):
+		dict[i] = [i]
+
+	var result = []
+	var reader = BitReader.new(data)
+
+	var prev = null
+
+	while true:
+		var code := reader.read_bits(code_size)
+
+		if code == clear_code:
+			# Reset dictionary
+			dict.clear()
+			for i in range(clear_code):
+				dict[i] = [i]
+			code_size = min_code_size + 1
+			next_code = end_code + 1
+			max_code = (1 << code_size) - 1
+			prev = null
+			continue
+
+		elif code == end_code:
+			break
+
+		var entry: PackedByteArray = []
+		if dict.has(code):
+			entry = dict[code]
+		elif code == next_code and prev != null:
+			entry = dict[prev] + [dict[prev][0]]
+		else:
+			# invalid (corrupted GIF)
+			break
+
+		# Output
+		for c in entry:
+			result.append(c)
+
+		if prev != null:
+			var new_entry := dict[prev] + [entry[0]]
+			dict[next_code] = new_entry
+			next_code += 1
+
+			# Increase code size if needed
+			if next_code > max_code and code_size < 12:
+				code_size += 1
+				max_code = (1 << code_size) - 1
+
+		prev = code
+
+	return result
