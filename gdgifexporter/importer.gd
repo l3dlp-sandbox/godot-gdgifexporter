@@ -2,7 +2,7 @@ class_name GIFImporter
 extends GIFDataTypes
 
 
-class Frame:
+class GifFrame:
 	var image: Image
 	var delay: float
 	var disposal_method: int
@@ -245,7 +245,7 @@ func handle_image_descriptor() -> int:
 	else:
 		image = load_progressive_image_data(color_table, w, h, transparent_color_index)
 
-	var new_frame := Frame.new()
+	var new_frame := GifFrame.new()
 	new_frame.image = image
 	if last_graphic_control_extension != null:
 		new_frame.delay = last_graphic_control_extension.delay_time
@@ -362,7 +362,7 @@ func import() -> int:
 	if has_global_color_table():
 		load_global_color_table()
 
-	# Frame loading loop
+	# GifFrame loading loop
 	while import_file.get_position() < import_file.get_length():
 		if import_file.eof_reached():
 			break

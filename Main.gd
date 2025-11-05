@@ -8,7 +8,7 @@ var img1: Image = preload("res://images/for_export/colors2.png").get_image()
 var img2: Image = preload("res://images/for_export/colors.png").get_image()
 var img3: Image = preload("res://images/for_export/one_color.png").get_image()
 var img4: Image = preload("res://images/for_export/half_transparent.png").get_image()
-var gifimporter = preload("res://gdgifexporter/gifimporter.gd")
+var gifimporter = preload("res://gdgifexporter/importer.gd")
 
 var export_thread := Thread.new()
 var timer := 0.0
