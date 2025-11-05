@@ -2,7 +2,7 @@ class_name GIFDataTypes
 extends RefCounted
 
 enum DisposalMethod {
-	NO_SPECIFIED = 0, DO_NOT_DISPOSE = 1, RESTORE_TO_BACKGROUND = 2, RESTORE_TO_PREVOIUS = 3
+	NO_SPECIFIED = 0, DO_NOT_DISPOSE = 1, RESTORE_TO_BACKGROUND = 2, RESTORE_TO_PREVIOUS = 3
 }
 
 const LittleEndian := preload("./little_endian.gd")

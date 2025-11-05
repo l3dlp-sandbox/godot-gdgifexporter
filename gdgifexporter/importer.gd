@@ -6,6 +6,7 @@ class GifFrame:
 	var image: Image
 	var delay: float
 	var disposal_method: int
+	var transparent_color_index := -1
 	var x: int
 	var y: int
 	var w: int
@@ -32,6 +33,8 @@ var global_color_table: Array[PackedByteArray]
 var is_animated: bool = false
 
 var last_graphic_control_extension: GraphicControlExtension = null
+var curr_canvas: Image
+var previous_canvas: Image
 
 
 func _init(file: FileAccess):
@@ -231,8 +234,6 @@ func handle_image_descriptor() -> int:
 	var size_of_local_color_table: int = pow(2, (packed_field & 0b111) + 1)
 	var local_color_table: Array[PackedByteArray] = []
 	var color_table: Array[PackedByteArray]
-	var image: Image
-
 	if has_local_color_table:
 		local_color_table = load_local_color_table(size_of_local_color_table)
 		color_table = local_color_table
@@ -240,17 +241,10 @@ func handle_image_descriptor() -> int:
 		color_table = global_color_table
 
 	var transparent_color_index: int = -1
+	var new_frame := GifFrame.new()
 	if last_graphic_control_extension != null:
 		if last_graphic_control_extension.uses_transparency:
 			transparent_color_index = last_graphic_control_extension.transparent_color_index
-
-	if is_interlace_flag_on:
-		image = load_interlaced_image_data(color_table, w, h, transparent_color_index)
-	else:
-		image = load_progressive_image_data(color_table, w, h, transparent_color_index)
-
-	var new_frame := GifFrame.new()
-	if last_graphic_control_extension != null:
 		new_frame.delay = last_graphic_control_extension.delay_time
 		new_frame.disposal_method = last_graphic_control_extension.disposal_method
 		last_graphic_control_extension = null
@@ -260,30 +254,45 @@ func handle_image_descriptor() -> int:
 		# want to tell end user that this frame has no delay.
 		new_frame.delay = -1
 		new_frame.disposal_method = DisposalMethod.RESTORE_TO_BACKGROUND
+
+	var image: Image
+	if is_interlace_flag_on:
+		image = load_interlaced_image_data(color_table, w, h, transparent_color_index)
+	else:
+		image = load_progressive_image_data(color_table, w, h, transparent_color_index)
 	if frames.size() > 0:
-		var curr_canvas := Image.new()
-		if new_frame.disposal_method == DisposalMethod.RESTORE_TO_BACKGROUND:
-			curr_canvas = Image.create_empty(w, h, false, image.get_format())
-			var r := color_table[background_color_index][R]
-			var g := color_table[background_color_index][G]
-			var b := color_table[background_color_index][B]
-			var a := 255
-			if background_color_index == transparent_color_index:
-				a = 0
-			var background_color := Color.from_rgba8(r, g, b, a)
-			curr_canvas.fill(background_color)
-			curr_canvas.blit_rect(
-				image, Rect2i(Vector2i.ZERO, curr_canvas.get_size()), Vector2i(x, y)
-			)
+		var prev_frame := frames[frames.size() - 1]
+		if prev_frame.disposal_method == DisposalMethod.RESTORE_TO_BACKGROUND:
+			if not global_color_table.is_empty():
+				var bg_image := Image.create_empty(w, h, false, image.get_format())
+				var r := global_color_table[background_color_index][R]
+				var g := global_color_table[background_color_index][G]
+				var b := global_color_table[background_color_index][B]
+				var a := 255
+				if background_color_index == transparent_color_index:
+					a = 0
+				var background_color := Color.from_rgba8(r, g, b, a)
+				bg_image.fill(background_color)
+				curr_canvas.fill(Color(0, 0, 0, 0))
+				curr_canvas.blit_rect(bg_image, Rect2i(x, y, w, h), Vector2i(x, y))
+			else:
+				curr_canvas.fill(Color(0, 0, 0, 0))
+		elif prev_frame.disposal_method == DisposalMethod.RESTORE_TO_PREVIOUS:
+			if is_instance_valid(previous_canvas):
+				curr_canvas.copy_from(previous_canvas)
+		if new_frame.disposal_method == DisposalMethod.RESTORE_TO_PREVIOUS:
+			previous_canvas = Image.new()
+			previous_canvas.copy_from(curr_canvas)
 		else:
-			var prev_frame := frames[frames.size() - 1]
-			var prev_image := prev_frame.image
-			curr_canvas.copy_from(prev_image)
-			curr_canvas.blit_rect_mask(
-				image, image, Rect2i(Vector2i.ZERO, curr_canvas.get_size()), Vector2i(x, y)
-			)
-		image = curr_canvas
-	new_frame.image = image
+			previous_canvas = null
+		curr_canvas.blit_rect_mask(
+			image, image, Rect2i(Vector2i.ZERO, curr_canvas.get_size()), Vector2i(x, y)
+		)
+	else:
+		curr_canvas = image
+	new_frame.image = Image.new()
+	new_frame.image.copy_from(curr_canvas)
+	new_frame.transparent_color_index = transparent_color_index
 	new_frame.x = x
 	new_frame.y = y
 	new_frame.w = w
@@ -389,6 +398,9 @@ func import() -> int:
 	if has_global_color_table():
 		load_global_color_table()
 
+	curr_canvas = Image.create_empty(
+		get_logical_screen_width(), get_logical_screen_height(), false, Image.FORMAT_RGBA8
+	)
 	# GifFrame loading loop
 	while import_file.get_position() < import_file.get_length():
 		if import_file.eof_reached():
