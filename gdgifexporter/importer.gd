@@ -20,6 +20,9 @@ const G: int = 1
 const B: int = 2
 
 var lzw := preload("./gif-lzw/lzw.gd").new()
+## If true, dispose method 2 disposes to transparent color instead of a background color,
+## if the gif uses any transparency at all.
+var dispose_to_transparent := false
 
 var header: PackedByteArray
 var logical_screen_descriptor: PackedByteArray
@@ -33,6 +36,7 @@ var global_color_table: Array[PackedByteArray]
 var is_animated: bool = false
 
 var last_graphic_control_extension: GraphicControlExtension = null
+var transparency_found := false
 var curr_canvas: Image
 var previous_canvas: Image
 
@@ -245,6 +249,7 @@ func handle_image_descriptor() -> int:
 	if last_graphic_control_extension != null:
 		if last_graphic_control_extension.uses_transparency:
 			transparent_color_index = last_graphic_control_extension.transparent_color_index
+			transparency_found = true
 		new_frame.delay = last_graphic_control_extension.delay_time
 		new_frame.disposal_method = last_graphic_control_extension.disposal_method
 		last_graphic_control_extension = null
@@ -263,7 +268,10 @@ func handle_image_descriptor() -> int:
 	if frames.size() > 0:
 		var prev_frame := frames[frames.size() - 1]
 		if prev_frame.disposal_method == DisposalMethod.RESTORE_TO_BACKGROUND:
-			if not global_color_table.is_empty():
+			var should_use_transparency := transparency_found and dispose_to_transparent
+			if global_color_table.is_empty():
+				should_use_transparency = true
+			if not should_use_transparency:
 				var bg_image := Image.create_empty(w, h, false, image.get_format())
 				var r := global_color_table[background_color_index][R]
 				var g := global_color_table[background_color_index][G]
